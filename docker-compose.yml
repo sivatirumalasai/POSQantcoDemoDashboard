@@ -1,0 +1,130 @@
+# One command runs the whole stack:  docker compose up --build
+# Services: Postgres · Redis · Django ASGI (DRF + Channels) · Celery (worker+beat)
+#           · 1s ticker · transaction simulator · React (Vite) frontend.
+# SQS is intentionally omitted for local — /ingest writes straight to Postgres
+# and the Redis read model (see README "How to run").
+
+x-backend-env: &backend-env
+  DJANGO_DEBUG: "1"
+  DJANGO_SECRET_KEY: "dev-insecure-key"
+  POSTGRES_DB: ops
+  POSTGRES_USER: ops
+  POSTGRES_PASSWORD: ops
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  REDIS_URL: redis://redis:6379/0
+  # ingest path: "sqs" routes through LocalStack SQS + a consumer; "inline" writes direct
+  INGEST_MODE: sqs
+  AWS_ENDPOINT_URL: http://localstack:4566
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_DEFAULT_REGION: ap-south-1
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ops
+      POSTGRES_USER: ops
+      POSTGRES_PASSWORD: ops
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ops"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sqs
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build: ./backend
+    environment:
+      <<: *backend-env
+      ROLE: web
+    command: daphne -b 0.0.0.0 -p 8000 ops.asgi:application
+    ports:
+      - "8000:8000"
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      localstack: {condition: service_healthy}
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      ROLE: worker
+    command: celery -A ops worker -B -l info
+    depends_on:
+      web: {condition: service_started}
+      redis: {condition: service_healthy}
+
+  ticker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      ROLE: ticker
+    command: python manage.py run_ticker
+    depends_on:
+      web: {condition: service_started}
+      redis: {condition: service_healthy}
+
+  consumer:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      ROLE: consumer
+    command: python manage.py consume
+    depends_on:
+      web: {condition: service_started}
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      localstack: {condition: service_healthy}
+
+  simulator:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      ROLE: simulator
+    command: python manage.py simulate --api http://web:8000 --rate 45
+    depends_on:
+      web: {condition: service_started}
+
+  frontend:
+    image: node:24
+    working_dir: /app
+    environment:
+      BACKEND_ORIGIN: http://web:8000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      web: {condition: service_started}
+
+volumes:
+  pgdata:
+  frontend_node_modules:

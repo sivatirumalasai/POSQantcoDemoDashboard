@@ -1,0 +1,15 @@
+[run]
+source = core
+omit =
+    */migrations/*
+    */tests/*
+    core/management/commands/run_ticker.py
+    core/management/commands/simulate.py
+    core/management/commands/consume.py
+    core/apps.py
+
+[report]
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

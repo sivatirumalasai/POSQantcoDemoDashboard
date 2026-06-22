@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quantaco · Real-Time Venue Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:            #0a0c10;
+    --bg-elev:       #11141b;
+    --panel:         #141821;
+    --panel-2:       #181d28;
+    --line:          #232a38;
+    --line-soft:     #1b212d;
+    --text:          #e9edf4;
+    --text-dim:      #98a3b6;
+    --text-faint:    #5c6779;
+    --brand:         #ff5c00;
+    --brand-soft:    rgba(255,92,0,.14);
+    --brand-glow:    rgba(255,92,0,.42);
+    --green:         #2fd07a;
+    --green-soft:    rgba(47,208,122,.13);
+    --red:           #ff4d5e;
+    --red-soft:      rgba(255,77,94,.13);
+    --amber:         #ffc043;
+    --amber-soft:    rgba(255,192,67,.13);
+    --blue:          #4b9bff;
+    --radius:        14px;
+    --shadow:        0 8px 30px rgba(0,0,0,.45);
+    --mono:          'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(255,92,0,.07), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(75,155,255,.05), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #283041; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #364056; background-clip: padding-box; }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ───────── Header ───────── */
+  header {
+    display: flex; align-items: center; gap: 24px;
+    padding: 14px 26px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(20,24,33,.9), rgba(13,16,22,.6));
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .logo { display: flex; align-items: center; gap: 11px; user-select: none; }
+  .logo .mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand), #ff8a3d);
+    display: grid; place-items: center;
+    box-shadow: 0 4px 16px var(--brand-glow);
+    position: relative; overflow: hidden;
+  }
+  .logo .mark::after {
+    content:''; position:absolute; inset:0;
+    background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,.35));
+  }
+  .logo .mark svg { position: relative; z-index: 1; }
+  .logo .word { line-height: 1; }
+  .logo .word b { font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: #fff; }
+  .logo .word b span { color: var(--brand); }
+  .logo .word small { display: block; margin-top: 3px; font-size: 9.5px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brand); }
+
+  .header-divider { width: 1px; height: 34px; background: var(--line); }
+  .title-block { line-height: 1.25; }
+  .title-block h1 { font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
+  .title-block p { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; }
+
+  .header-spacer { flex: 1; }
+
+  .clock { font-family: var(--mono); font-size: 13px; color: var(--text-dim); letter-spacing: .5px; }
+  .clock b { color: var(--text); }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 13px; border-radius: 999px;
+    background: var(--green-soft); color: var(--green);
+    font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(47,208,122,.25);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; position: relative; }
+  .dot::after {
+    content:''; position:absolute; inset:-4px; border-radius:50%;
+    background: currentColor; opacity:.4; animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse { 0%{transform:scale(.6);opacity:.5} 100%{transform:scale(2.4);opacity:0} }
+
+  .tick-meter {
+    display: flex; align-items: center; gap: 9px;
+    font-family: var(--mono); font-size: 11px; color: var(--text-faint);
+  }
+  .tick-bar { width: 64px; height: 5px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .tick-bar > i { display:block; height:100%; width:0%; background: var(--brand); border-radius:4px; }
+
+  /* ───────── KPI strip ───────── */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 18px 26px 4px; }
+  .kpi {
+    background: linear-gradient(180deg, var(--panel), var(--bg-elev));
+    border: 1px solid var(--line-soft); border-radius: var(--radius);
+    padding: 16px 18px; position: relative; overflow: hidden;
+  }
+  .kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--accent, var(--brand)); opacity:.85; }
+  .kpi .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--text-faint); display:flex; align-items:center; gap:7px; }
+  .kpi .val { font-family: var(--mono); font-size: 27px; font-weight: 700; margin-top: 9px; letter-spacing: -.5px; }
+  .kpi .val .cur { font-size: 16px; color: var(--text-dim); margin-right: 2px; }
+  .kpi .sub { font-size: 11.5px; color: var(--text-dim); margin-top: 5px; }
+  .kpi .sub b { font-family: var(--mono); }
+  .up { color: var(--green); } .down { color: var(--red); }
+  .spark { position: absolute; right: 14px; bottom: 12px; opacity: .55; }
+
+  /* ───────── Main grid ───────── */
+  main {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: 1.55fr 1fr 0.95fr;
+    gap: 16px; padding: 16px 26px 22px;
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line-soft);
+    border-radius: var(--radius); display: flex; flex-direction: column;
+    min-height: 0; overflow: hidden; box-shadow: var(--shadow);
+  }
+  .panel > .head {
+    display:flex; align-items:center; gap:10px;
+    padding: 14px 16px; border-bottom: 1px solid var(--line-soft);
+  }
+  .panel > .head h2 { font-size: 13px; font-weight: 700; letter-spacing: .2px; }
+  .panel > .head .count { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+  .panel > .head .spacer { flex: 1; }
+  .panel > .body { flex: 1; min-height: 0; overflow-y: auto; }
+
+  .seg { display: inline-flex; background: var(--bg-elev); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+  .seg button {
+    border: 0; background: transparent; color: var(--text-dim);
+    font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    padding: 5px 11px; border-radius: 6px; transition: .15s;
+  }
+  .seg button.on { background: var(--brand); color: #fff; box-shadow: 0 2px 8px var(--brand-glow); }
+
+  /* Ranking rows */
+  .row {
+    display: grid; grid-template-columns: 30px 1fr auto; align-items: center;
+    gap: 12px; padding: 11px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+    transition: background .15s, transform .25s cubic-bezier(.2,.8,.2,1);
+    position: relative;
+  }
+  .row:hover { background: var(--panel-2); }
+  .row.sel { background: var(--brand-soft); }
+  .row.sel::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--brand); }
+  .row.flash { animation: flash .8s ease-out; }
+  @keyframes flash { 0%{ background: rgba(255,92,0,.22);} 100%{ background: transparent;} }
+  .rank-no { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--text-faint); text-align: center; }
+  .rank-no.top { color: var(--brand); }
+  .venue-name { font-size: 13.5px; font-weight: 600; display:flex; align-items:center; gap:8px; }
+  .venue-meta { font-size: 11px; color: var(--text-faint); margin-top: 3px; font-family: var(--mono); }
+  .badge-sm { font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; text-transform: uppercase; letter-spacing: .4px; }
+  .b-hot { background: var(--brand-soft); color: var(--brand); }
+  .b-drop { background: var(--red-soft); color: var(--red); }
+  .b-spike { background: var(--amber-soft); color: var(--amber); }
+  .venue-val { text-align: right; }
+  .venue-val .amt { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  .venue-val .bar { width: 110px; height: 5px; border-radius: 4px; background: var(--line); margin-top: 6px; overflow:hidden; margin-left:auto; }
+  .venue-val .bar > i { display:block; height:100%; background: linear-gradient(90deg, var(--brand), #ff9a52); border-radius:4px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+
+  /* Top items */
+  .item-row { display:flex; align-items:center; gap:12px; padding: 11px 16px; border-bottom: 1px solid var(--line-soft); }
+  .item-rank { width: 22px; font-family: var(--mono); font-size: 12px; font-weight:700; color: var(--text-faint); }
+  .item-main { flex:1; min-width:0; }
+  .item-name { font-size: 13px; font-weight: 600; }
+  .item-bar { height: 6px; border-radius: 4px; background: var(--line); margin-top: 7px; overflow: hidden; }
+  .item-bar > i { display:block; height:100%; background: linear-gradient(90deg, var(--blue), #7db8ff); border-radius:4px; transition: width .6s; }
+  .item-qty { font-family: var(--mono); font-size: 13px; font-weight:700; min-width: 54px; text-align:right; }
+  .item-qty small { display:block; font-size:10px; color: var(--text-faint); font-weight:600; }
+
+  /* Anomaly rail */
+  .flag {
+    margin: 11px 14px; padding: 13px 14px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--bg-elev);
+    border-left-width: 3px; position: relative;
+    animation: slideIn .4s ease-out;
+  }
+  @keyframes slideIn { from{opacity:0; transform: translateX(12px);} to{opacity:1; transform:none;} }
+  .flag.drop { border-left-color: var(--red); }
+  .flag.spike { border-left-color: var(--amber); }
+  .flag.hot { border-left-color: var(--brand); }
+  .flag .ftop { display:flex; align-items:center; gap:8px; margin-bottom: 6px; }
+  .flag .ftype { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing:.5px; }
+  .flag.drop .ftype { color: var(--red); } .flag.spike .ftype { color: var(--amber); } .flag.hot .ftype { color: var(--brand); }
+  .flag .ftime { margin-left:auto; font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
+  .flag .fvenue { font-size: 13px; font-weight: 600; }
+  .flag .fwhy { font-size: 11.5px; color: var(--text-dim); margin-top: 5px; line-height: 1.45; }
+
+  .empty { text-align:center; color: var(--text-faint); font-size: 12.5px; padding: 40px 20px; }
+  .empty svg { opacity:.4; margin-bottom: 10px; }
+
+  /* Drill panel (overlay slide-in) */
+  .drill {
+    position: fixed; top:0; right:0; bottom:0; width: 440px; max-width: 92vw;
+    background: var(--bg-elev); border-left: 1px solid var(--line);
+    box-shadow: -20px 0 60px rgba(0,0,0,.55);
+    transform: translateX(100%); transition: transform .35s cubic-bezier(.2,.8,.2,1);
+    z-index: 50; display: flex; flex-direction: column;
+  }
+  .drill.open { transform: none; }
+  .drill .dhead { padding: 18px 20px; border-bottom: 1px solid var(--line); display:flex; align-items:flex-start; gap:12px; }
+  .drill .dhead h3 { font-size: 17px; font-weight: 700; }
+  .drill .dhead p { font-size: 12px; color: var(--text-dim); margin-top: 4px; font-family: var(--mono); }
+  .drill .close { margin-left:auto; background: var(--panel); border:1px solid var(--line); color: var(--text-dim); width: 32px; height:32px; border-radius:8px; cursor:pointer; font-size:16px; transition:.15s; }
+  .drill .close:hover { color: var(--text); border-color: var(--brand); }
+  .drill .dbody { flex:1; overflow-y:auto; padding: 18px 20px; }
+  .dstat-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .dstat { background: var(--panel); border:1px solid var(--line-soft); border-radius:11px; padding: 13px 14px; }
+  .dstat .l { font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color: var(--text-faint); font-weight:600; }
+  .dstat .v { font-family: var(--mono); font-size: 20px; font-weight:700; margin-top:6px; }
+  .sec-title { font-size: 11px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--text-faint); margin: 4px 0 12px; }
+  .chart { display:flex; align-items:flex-end; gap:5px; height: 130px; padding: 10px 4px 0; border-bottom:1px solid var(--line-soft); margin-bottom: 6px; }
+  .chart .col { flex:1; background: linear-gradient(180deg, var(--brand), rgba(255,92,0,.25)); border-radius: 4px 4px 0 0; min-height:3px; position:relative; transition: height .5s; }
+  .chart .col:hover { filter: brightness(1.2); }
+  .chart .col.now { background: linear-gradient(180deg, #ff9a52, var(--brand)); box-shadow: 0 0 12px var(--brand-glow); }
+  .chart-x { display:flex; gap:5px; font-family:var(--mono); font-size:8.5px; color:var(--text-faint); margin-bottom: 24px; }
+  .chart-x span { flex:1; text-align:center; }
+
+  .footer-note { padding: 9px 26px; border-top:1px solid var(--line); font-size: 11px; color: var(--text-faint); display:flex; gap:18px; align-items:center; }
+  .footer-note .mono { font-family: var(--mono); }
+  .footer-note .spacer { flex:1; }
+
+  .scrim { position:fixed; inset:0; background: rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:.3s; z-index:40; }
+  .scrim.show { opacity:1; pointer-events:auto; }
+
+  @media (max-width: 1200px) {
+    main { grid-template-columns: 1fr 1fr; }
+    .panel.anom { grid-column: 1 / -1; }
+    .kpis { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <div class="mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2 L21 7 V17 L12 22 L3 17 V7 Z" stroke="#fff" stroke-width="1.6" opacity=".9"/>
+          <circle cx="12" cy="12" r="3.2" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="word">
+        <b>Quanta<span>co</span></b>
+        <small>Potential. Delivered.</small>
+      </div>
+    </div>
+
+    <div class="header-divider"></div>
+    <div class="title-block">
+      <h1>Real-Time Venue Operations</h1>
+      <p>Live group-wide trade · 40 venues · no refresh</p>
+    </div>
+
+    <div class="header-spacer"></div>
+
+    <div class="tick-meter" title="1s batching tick — coalesces all dirty venues into one snapshot">
+      <span>TICK</span>
+      <div class="tick-bar"><i id="tickFill"></i></div>
+    </div>
+    <div class="clock"><b id="clock">--:--:--</b></div>
+    <div class="status-pill"><span class="dot"></span> LIVE · WebSocket</div>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi" style="--accent:var(--brand)">
+      <div class="label">Net Sales · Today</div>
+      <div class="val"><span class="cur">$</span><span id="kpiNet">0</span></div>
+      <div class="sub"><span class="up" id="kpiNetTrend">▲ 0%</span> vs same time yesterday</div>
+      <svg class="spark" width="70" height="26" id="sparkNet"></svg>
+    </div>
+    <div class="kpi" style="--accent:var(--green)">
+      <div class="label">Net Sales / min</div>
+      <div class="val"><span class="cur">$</span><span id="kpiRate">0</span></div>
+      <div class="sub">rolling 60-second run-rate</div>
+      <svg class="spark" width="70" height="26" id="sparkRate"></svg>
+    </div>
+    <div class="kpi" style="--accent:var(--blue)">
+      <div class="label">Transactions / sec</div>
+      <div class="val"><span id="kpiTps">0</span></div>
+      <div class="sub"><b id="kpiTxns">0</b> processed today</div>
+      <svg class="spark" width="70" height="26" id="sparkTps"></svg>
+    </div>
+    <div class="kpi" style="--accent:var(--red)">
+      <div class="label">Active Anomalies</div>
+      <div class="val"><span id="kpiFlags">0</span></div>
+      <div class="sub"><span id="kpiFlagsBreak">all venues healthy</span></div>
+    </div>
+  </section>
+
+  <main>
+    <!-- Venue Ranking Board -->
+    <div class="panel">
+      <div class="head">
+        <h2>Venue Ranking</h2>
+        <span class="count" id="venueCount">40 venues</span>
+        <div class="spacer"></div>
+        <span class="count">ranking:today · live</span>
+      </div>
+      <div class="body" id="ranking"></div>
+    </div>
+
+    <!-- Top Items -->
+    <div class="panel">
+      <div class="head">
+        <h2>Top Items</h2>
+        <div class="spacer"></div>
+        <div class="seg" id="itemScope">
+          <button class="on" data-scope="group">Group</button>
+          <button data-scope="venue">Selected venue</button>
+        </div>
+      </div>
+      <div class="body" id="topItems"></div>
+    </div>
+
+    <!-- Anomaly Rail -->
+    <div class="panel anom">
+      <div class="head">
+        <h2>Anomaly Rail</h2>
+        <span class="count" id="anomCount">flags:active</span>
+      </div>
+      <div class="body" id="anomalies"></div>
+    </div>
+  </main>
+
+  <div class="footer-note">
+    <span>CQRS-lite · SQS ingest buffer · Redis read model · Django Channels fan-out</span>
+    <span class="spacer"></span>
+    <span class="mono">end-to-end latency ≈ <b style="color:var(--green)">1.1s</b> median</span>
+    <span class="mono">|</span>
+    <span class="mono" id="uptime">session 00:00</span>
+  </div>
+</div>
+
+<!-- Drill-down panel -->
+<div class="scrim" id="scrim"></div>
+<aside class="drill" id="drill">
+  <div class="dhead">
+    <div>
+      <h3 id="drillName">—</h3>
+      <p id="drillMeta">—</p>
+    </div>
+    <button class="close" id="drillClose">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="dstat-grid">
+      <div class="dstat"><div class="l">Net Sales</div><div class="v" id="dNet">$0</div></div>
+      <div class="dstat"><div class="l">Transactions</div><div class="v" id="dTxns">0</div></div>
+      <div class="dstat"><div class="l">Voids</div><div class="v" id="dVoids" style="color:var(--amber)">0</div></div>
+      <div class="dstat"><div class="l">Refunds</div><div class="v" id="dRefunds" style="color:var(--red)">0</div></div>
+    </div>
+    <div class="sec-title">Hourly trade · today</div>
+    <div class="chart" id="dChart"></div>
+    <div class="chart-x" id="dChartX"></div>
+    <div class="sec-title">Top items · this venue</div>
+    <div id="dItems"></div>
+  </div>
+</aside>
+
+<script>
+(() => {
+  // ───────── Seed data ─────────
+  const fmt = n => n.toLocaleString('en-US');
+  const money = n => '$' + Math.round(n).toLocaleString('en-US');
+  const moneyK = n => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'k' : '$' + Math.round(n);
+  const pad = n => String(n).padStart(2,'0');
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  const CITIES = ['Sydney','Melbourne','Brisbane','Perth','Adelaide','Gold Coast','Newcastle','Canberra','Hobart','Darwin'];
+  const TYPES  = ['Taphouse','Rooftop Bar','Bistro','Grill','Wine Room','Brewhouse','Kitchen','Lounge','Cantina','Smokehouse'];
+  const ITEMS  = [
+    'Pale Ale Schooner','Margherita Pizza','Wagyu Burger','House Negroni','Loaded Fries',
+    'Espresso Martini','Garlic Bread','Chicken Parma','Pinot Noir','Calamari',
+    'Aperol Spritz','Tasting Plate','Pulled Pork Roll','Frozen Margarita','Truffle Pasta',
+    'Salt & Pepper Squid','Sparkling Water','Flat White','Cheese Board','Sticky Date Pudding'
+  ];
+
+  // build 40 venues
+  const venues = [];
+  for (let i = 0; i < 40; i++) {
+    const baseRate = 0.4 + Math.random() * 1.6; // relative throughput
+    venues.push({
+      id: i + 1,
+      name: `${pick(CITIES)} ${pick(TYPES)}`,
+      net: Math.random() * 4000 + 800,
+      txns: Math.floor(Math.random() * 400 + 60),
+      voids: Math.floor(Math.random() * 8),
+      refunds: Math.floor(Math.random() * 12),
+      rate: baseRate,
+      flag: null,
+      hourly: Array.from({length: 18}, () => Math.random() * 600 + 100),
+      items: {},
+      lastNet: 0,
+    });
+  }
+  // unique-ish names
+  const seen = {};
+  venues.forEach(v => { while (seen[v.name]) v.name += ' II'; seen[v.name] = 1; });
+
+  const groupItems = {};
+  ITEMS.forEach(it => groupItems[it] = Math.floor(Math.random()*300+50));
+
+  // ───────── State ─────────
+  let selectedVenue = null;
+  let itemScope = 'group';
+  let totalTxns = venues.reduce((s,v)=>s+v.txns,0);
+  let tpsWindow = [];
+  let netHistory = [], rateHistory = [], tpsHistory = [];
+  const flags = [];
+  const sessionStart = Date.now();
+
+  // ───────── DOM ─────────
+  const $ = id => document.getElementById(id);
+  const rankingEl = $('ranking'), topItemsEl = $('topItems'), anomEl = $('anomalies');
+  const rowEls = {};
+
+  // ───────── Rendering ─────────
+  function renderRankingShell() {
+    rankingEl.innerHTML = '';
+    venues.forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'row'; row.dataset.id = v.id;
+      row.onclick = () => openDrill(v.id);
+      rankingEl.appendChild(row);
+      rowEls[v.id] = row;
+    });
+  }
+
+  function renderRanking(flashId) {
+    const sorted = [...venues].sort((a,b)=>b.net-a.net);
+    const max = sorted[0].net || 1;
+    sorted.forEach((v, idx) => {
+      const row = rowEls[v.id];
+      row.style.order = idx;
+      const flagBadge = v.flag
+        ? `<span class="badge-sm ${v.flag==='hot'?'b-hot':v.flag==='drop'?'b-drop':'b-spike'}">${v.flag}</span>` : '';
+      row.innerHTML = `
+        <div class="rank-no ${idx<3?'top':''}">${idx+1}</div>
+        <div>
+          <div class="venue-name">${v.name} ${flagBadge}</div>
+          <div class="venue-meta">${fmt(v.txns)} txns · ${v.voids}v · ${v.refunds}r</div>
+        </div>
+        <div class="venue-val">
+          <div class="amt">${money(v.net)}</div>
+          <div class="bar"><i style="width:${(v.net/max*100).toFixed(1)}%"></i></div>
+        </div>`;
+      row.classList.toggle('sel', v.id === selectedVenue);
+      if (v.id === flashId) {
+        row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+      }
+    });
+    // reorder via flex order; container needs flex column
+    rankingEl.style.display = 'flex';
+    rankingEl.style.flexDirection = 'column';
+  }
+
+  function renderTopItems() {
+    let data, accentVenue = null;
+    if (itemScope === 'venue' && selectedVenue) {
+      const v = venues.find(x=>x.id===selectedVenue);
+      accentVenue = v.name;
+      data = Object.entries(v.items);
+      if (!data.length) ITEMS.slice(0,6).forEach(it => v.items[it] = Math.floor(Math.random()*40+5)), data = Object.entries(v.items);
+    } else {
+      data = Object.entries(groupItems);
+    }
+    data.sort((a,b)=>b[1]-a[1]);
+    const top = data.slice(0, 8);
+    const max = top[0] ? top[0][1] : 1;
+    topItemsEl.innerHTML =
+      (accentVenue ? `<div style="padding:10px 16px 4px;font-size:11px;color:var(--text-faint)">${accentVenue}</div>` : '') +
+      top.map((d,i)=>`
+      <div class="item-row">
+        <div class="item-rank">${i+1}</div>
+        <div class="item-main">
+          <div class="item-name">${d[0]}</div>
+          <div class="item-bar"><i style="width:${(d[1]/max*100).toFixed(0)}%"></i></div>
+        </div>
+        <div class="item-qty">${fmt(d[1])}<small>sold</small></div>
+      </div>`).join('');
+  }
+
+  function renderAnomalies() {
+    const active = flags.filter(f=>f.active).slice(-12).reverse();
+    $('anomCount').textContent = `${active.length} active`;
+    if (!active.length) {
+      anomEl.innerHTML = `<div class="empty">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <div>All 40 venues trading normally.<br>No active flags.</div></div>`;
+      return;
+    }
+    anomEl.innerHTML = active.map(f=>`
+      <div class="flag ${f.type}">
+        <div class="ftop">
+          <span class="ftype">${f.type==='drop'?'Sales Drop':f.type==='spike'?'Void / Refund Spike':'Running Hot'}</span>
+          <span class="ftime">${f.time}</span>
+        </div>
+        <div class="fvenue">${f.venue}</div>
+        <div class="fwhy">${f.why}</div>
+      </div>`).join('');
+  }
+
+  // sparklines
+  function spark(id, data, color) {
+    const el = $(id); if (!el) return;
+    const w = 70, h = 26, n = data.length;
+    if (n < 2) { el.innerHTML=''; return; }
+    const min = Math.min(...data), max = Math.max(...data), rng = (max-min)||1;
+    const pts = data.map((d,i)=>`${(i/(n-1)*w).toFixed(1)},${(h-2 - (d-min)/rng*(h-4)).toFixed(1)}`).join(' ');
+    el.innerHTML = `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+
+  // ───────── KPIs ─────────
+  function renderKPIs() {
+    const net = venues.reduce((s,v)=>s+v.net,0);
+    $('kpiNet').textContent = fmt(Math.round(net));
+    const rate = rateHistory.length ? rateHistory[rateHistory.length-1] : 0;
+    $('kpiRate').textContent = fmt(Math.round(rate));
+    const tps = tpsWindow.length;
+    $('kpiTps').textContent = tps;
+    $('kpiTxns').textContent = fmt(totalTxns);
+    const af = flags.filter(f=>f.active);
+    $('kpiFlags').textContent = af.length;
+    const drops = af.filter(f=>f.type==='drop').length, spikes = af.filter(f=>f.type==='spike').length, hots = af.filter(f=>f.type==='hot').length;
+    $('kpiFlagsBreak').textContent = af.length
+      ? `${drops} drop · ${spikes} spike · ${hots} hot`
+      : 'all venues healthy';
+    $('kpiFlags').style.color = af.length ? 'var(--red)' : 'var(--green)';
+
+    spark('sparkNet', netHistory.slice(-24), '#ff5c00');
+    spark('sparkRate', rateHistory.slice(-24), '#2fd07a');
+    spark('sparkTps', tpsHistory.slice(-24), '#4b9bff');
+  }
+
+  // ───────── Simulator (POS firehose) ─────────
+  function emitTxn() {
+    const v = pick(venues.filter(x => Math.random() < x.rate / 2 + 0.15)) || pick(venues);
+    const isRefund = Math.random() < 0.04;
+    const isVoid   = Math.random() < 0.03;
+    const amt = Math.random() * 70 + 8;
+    if (isRefund) { v.net -= amt; v.refunds++; }
+    else if (isVoid) { v.voids++; }
+    else {
+      v.net += amt; v.txns++; totalTxns++;
+      const item = pick(ITEMS);
+      groupItems[item] = (groupItems[item]||0) + 1;
+      v.items[item] = (v.items[item]||0) + 1;
+      v.hourly[v.hourly.length-1] += amt;
+    }
+    tpsWindow.push(Date.now());
+  }
+
+  function maybeAnomaly() {
+    if (Math.random() > 0.5) return;
+    const v = pick(venues);
+    if (v.flag) return;
+    const r = Math.random();
+    const now = new Date(), time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    let type, why;
+    if (r < 0.4) {
+      type='drop'; why=`Run-rate fell to ${Math.floor(Math.random()*15+45)}% of trailing baseline for 2 consecutive windows.`;
+    } else if (r < 0.75) {
+      type='spike'; const pct=Math.floor(Math.random()*12+9);
+      why=`(voids + refunds) / sales hit ${pct}% over the rolling 30-min window — above this venue's threshold.`;
+    } else {
+      type='hot'; const pct=Math.floor(Math.random()*40+30);
+      why=`Trading ${pct}% above baseline — positive signal. Consider routing support to this venue.`;
+    }
+    v.flag = type;
+    flags.push({ venue: v.name, type, why, time, active: true, born: Date.now() });
+  }
+
+  function clearOldAnomalies() {
+    flags.forEach(f => {
+      if (f.active && Date.now() - f.born > 16000) {
+        f.active = false;
+        const v = venues.find(x=>x.name===f.venue); if (v) v.flag = null;
+      }
+    });
+  }
+
+  // ───────── Tick loop (1s batched snapshot) ─────────
+  let lastFlash = null, lastNetSnapshot = venues.reduce((s,v)=>s+v.net,0);
+  function tick() {
+    // trim tps window to last 1s
+    const cut = Date.now() - 1000;
+    tpsWindow = tpsWindow.filter(t => t > cut);
+
+    const net = venues.reduce((s,v)=>s+v.net,0);
+    const rate = Math.max(0, net - lastNetSnapshot) * 60; // per-min projection
+    lastNetSnapshot = net;
+    netHistory.push(net); if (netHistory.length>60) netHistory.shift();
+    rateHistory.push(rate); if (rateHistory.length>60) rateHistory.shift();
+    tpsHistory.push(tpsWindow.length); if (tpsHistory.length>60) tpsHistory.shift();
+
+    // flash the biggest mover
+    let mover = null, best = -1;
+    venues.forEach(v => { const d = v.net - (v.lastNet||v.net); if (d > best) { best = d; mover = v.id; } v.lastNet = v.net; });
+
+    clearOldAnomalies();
+    renderRanking(best > 30 ? mover : null);
+    renderTopItems();
+    renderAnomalies();
+    renderKPIs();
+    if (selectedVenue) updateDrill();
+
+    // tick meter animation
+    const fill = $('tickFill');
+    fill.style.transition='none'; fill.style.width='0%';
+    requestAnimationFrame(()=>{ fill.style.transition='width 1s linear'; fill.style.width='100%'; });
+  }
+
+  // ───────── Drill-down ─────────
+  const drill = $('drill'), scrim = $('scrim');
+  function openDrill(id) {
+    selectedVenue = id;
+    drill.classList.add('open'); scrim.classList.add('show');
+    renderRanking(); updateDrill();
+  }
+  function closeDrill() {
+    drill.classList.remove('open'); scrim.classList.remove('show');
+    selectedVenue = null; renderRanking();
+    if (itemScope === 'venue') { itemScope='group'; syncSeg(); renderTopItems(); }
+  }
+  function updateDrill() {
+    const v = venues.find(x=>x.id===selectedVenue); if (!v) return;
+    const rank = [...venues].sort((a,b)=>b.net-a.net).findIndex(x=>x.id===v.id)+1;
+    $('drillName').textContent = v.name;
+    $('drillMeta').textContent = `Rank #${rank} of 40 · venue ${pad(v.id)}`;
+    $('dNet').textContent = money(v.net);
+    $('dTxns').textContent = fmt(v.txns);
+    $('dVoids').textContent = v.voids;
+    $('dRefunds').textContent = v.refunds;
+    // hourly chart
+    const max = Math.max(...v.hourly)||1;
+    $('dChart').innerHTML = v.hourly.map((h,i)=>
+      `<div class="col ${i===v.hourly.length-1?'now':''}" style="height:${(h/max*100).toFixed(0)}%" title="${money(h)}"></div>`).join('');
+    const startH = 6;
+    $('dChartX').innerHTML = v.hourly.map((_,i)=> i%3===0 ? `<span>${pad((startH+i)%24)}</span>` : `<span></span>`).join('');
+    // items
+    let items = Object.entries(v.items);
+    if (!items.length) { ITEMS.slice(0,5).forEach(it=>v.items[it]=Math.floor(Math.random()*30+5)); items=Object.entries(v.items); }
+    items.sort((a,b)=>b[1]-a[1]);
+    const im = items[0]?items[0][1]:1;
+    $('dItems').innerHTML = items.slice(0,6).map((d,i)=>`
+      <div class="item-row" style="padding-left:0;padding-right:0">
+        <div class="item-rank">${i+1}</div>
+        <div class="item-main"><div class="item-name">${d[0]}</div>
+        <div class="item-bar"><i style="width:${(d[1]/im*100).toFixed(0)}%"></i></div></div>
+        <div class="item-qty">${d[1]}<small>sold</small></div>
+      </div>`).join('');
+  }
+  $('drillClose').onclick = closeDrill;
+  scrim.onclick = closeDrill;
+  document.addEventListener('keydown', e => { if (e.key==='Escape') closeDrill(); });
+
+  // segmented control
+  function syncSeg() {
+    document.querySelectorAll('#itemScope button').forEach(b =>
+      b.classList.toggle('on', b.dataset.scope === itemScope));
+  }
+  document.querySelectorAll('#itemScope button').forEach(b => b.onclick = () => {
+    itemScope = b.dataset.scope;
+    if (itemScope==='venue' && !selectedVenue) openDrill([...venues].sort((a,b)=>b.net-a.net)[0].id);
+    syncSeg(); renderTopItems();
+  });
+
+  // clock + uptime
+  function clockTick() {
+    const d = new Date();
+    $('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const el = Math.floor((Date.now()-sessionStart)/1000);
+    $('uptime').textContent = `session ${pad(Math.floor(el/60))}:${pad(el%60)}`;
+    // net trend
+    const trend = (Math.sin(Date.now()/9000)*6 + 8).toFixed(1);
+    $('kpiNetTrend').textContent = `▲ ${trend}%`;
+  }
+
+  // ───────── Boot ─────────
+  renderRankingShell();
+  renderRanking();
+  renderTopItems();
+  renderAnomalies();
+  renderKPIs();
+
+  // firehose: bursty stream of transactions
+  setInterval(() => { const n = Math.floor(Math.random()*22+8); for (let i=0;i<n;i++) emitTxn(); }, 120);
+  setInterval(maybeAnomaly, 3500);
+  setInterval(tick, 1000);          // the 1s batching tick
+  setInterval(clockTick, 1000);
+  clockTick();
+})();
+</script>
+</body>
+</html>
