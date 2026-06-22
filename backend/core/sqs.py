@@ -16,6 +16,15 @@ def client():
         if settings.AWS_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_ENDPOINT_URL
         _client = boto3.client("sqs", **kwargs)
+    else: 
+        #validate the existing client is still valid (e.g. LocalStack restarted)
+        try:
+            _client.list_queues(MaxResults=1)
+        except Exception:
+            kwargs = {"region_name": settings.AWS_REGION}
+            if settings.AWS_ENDPOINT_URL:
+                kwargs["endpoint_url"] = settings.AWS_ENDPOINT_URL
+            _client = boto3.client("sqs", **kwargs) 
     return _client
 
 

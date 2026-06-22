@@ -1,11 +1,44 @@
 # Running the full stack locally
 
+## Prerequisites
+
+The fastest path needs only **Docker** (with the Compose plugin) and **git** —
+everything else (Python, Node, Postgres, Redis) runs inside containers.
+
+- [Docker Engine](https://docs.docker.com/engine/install/) + the `docker compose`
+  plugin (`docker compose version` should print v2.x)
+- `git`
+- Ports **3000** (frontend), **8000** (API), **5432** (Postgres), **6379**
+  (Redis), and **4566** (LocalStack/SQS) free on the host
+
+> On Linux, add yourself to the `docker` group so you don't need `sudo`:
+> `sudo usermod -aG docker $USER`, then open a new terminal (or run `newgrp docker`).
+
+Optional, only if you want to run the suites/services *outside* Docker:
+Python 3.12+ and Node 20+.
+
+## Get the code
+
+Clone the repository from GitHub and enter the project directory:
+
+```bash
+git clone https://github.com/sivatirumalasai/POSQantcoDemoDashboard.git
+cd POSQantcoDemoDashboard
+```
+
+To pull the latest changes later:
+
+```bash
+git pull origin main
+```
+
+## Run it — one command
+
 One command boots everything — Postgres, Redis, the Django ASGI API (DRF +
 Channels), a Celery worker (+ beat), the 1-second ticker, the transaction
 simulator, and the React frontend:
 
 ```bash
-cd QantcoPOSDashboard
 docker compose up --build
 ```
 
